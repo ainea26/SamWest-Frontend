@@ -20,9 +20,21 @@ import type {
 } from "@/types/product";
 import { BookingTracking } from "@/types/tracking";
 
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://127.0.0.1:8001/api"
+const LOCAL_API_URL =
+  "http://127.0.0.1:8001/api";
+
+const PRODUCTION_API_URL =
+  "https://samwest-production.up.railway.app/api";
+
+const configuredApiUrl =
+  process.env.API_URL?.trim() ||
+  process.env.NEXT_PUBLIC_API_URL?.trim();
+
+export const API_BASE_URL = (
+  configuredApiUrl ||
+  (process.env.NODE_ENV === "production"
+    ? PRODUCTION_API_URL
+    : LOCAL_API_URL)
 ).replace(/\/+$/, "");
 
 const api = axios.create({

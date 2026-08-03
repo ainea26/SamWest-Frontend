@@ -7,7 +7,6 @@ import {
   TriangleAlert,
 } from "lucide-react";
 
-import CategorySection from "@/components/home/CategorySection";
 import DealsSection from "@/components/home/DealsSection";
 import FeaturedProducts from "@/components/home/FeaturedProducts";
 import NewArrivals from "@/components/home/NewArrivals";
@@ -107,8 +106,8 @@ const [homepageResult, fallbackProductsResult] = await Promise.allSettled([
                 <h2 className="font-black">Products could not be loaded</h2>
 
                 <p className="mt-1 text-sm leading-6">
-                  Make sure the SamWest Django server is running at
-                  http://127.0.0.1:8001.
+                  We could not connect to the SamWest product service. Please
+                  refresh the page or try again shortly.
                 </p>
               </div>
             </div>
