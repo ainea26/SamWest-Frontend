@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  AlertTriangle,
   ArrowRight,
+  LoaderCircle,
   PackageOpen,
   ShoppingBasket,
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import BookingItem from "@/components/booking/BookingItem";
 import { useBooking } from "@/context/BookingContext";
@@ -17,7 +19,16 @@ import { formatCurrency } from "@/lib/formatters";
 
 export default function BookingDrawer() {
   const pathname = usePathname();
+
   const previousPathnameRef = useRef(pathname);
+
+  const clearTimerRef = useRef<number | null>(null);
+
+  const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const [isClearConfirmationOpen, setIsClearConfirmationOpen] = useState(false);
+
+  const [isClearing, setIsClearing] = useState(false);
 
   const {
     items,
@@ -34,9 +45,31 @@ export default function BookingDrawer() {
   useEffect(() => {
     if (previousPathnameRef.current !== pathname) {
       previousPathnameRef.current = pathname;
+
       closeDrawer();
     }
   }, [pathname, closeDrawer]);
+
+  useEffect(() => {
+    if (isClearConfirmationOpen) {
+      confirmButtonRef.current?.focus();
+    }
+  }, [isClearConfirmationOpen]);
+
+  useEffect(() => {
+    if (isDrawerOpen) {
+      return;
+    }
+
+    setIsClearConfirmationOpen(false);
+    setIsClearing(false);
+
+    if (clearTimerRef.current !== null) {
+      window.clearTimeout(clearTimerRef.current);
+
+      clearTimerRef.current = null;
+    }
+  }, [isDrawerOpen]);
 
   useEffect(() => {
     if (!isDrawerOpen) {
@@ -48,9 +81,20 @@ export default function BookingDrawer() {
     document.body.style.overflow = "hidden";
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        closeDrawer();
+      if (event.key !== "Escape") {
+        return;
       }
+
+      if (isClearing) {
+        return;
+      }
+
+      if (isClearConfirmationOpen) {
+        setIsClearConfirmationOpen(false);
+        return;
+      }
+
+      closeDrawer();
     }
 
     window.addEventListener("keydown", handleKeyDown);
@@ -60,7 +104,48 @@ export default function BookingDrawer() {
 
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isDrawerOpen, closeDrawer]);
+  }, [isDrawerOpen, isClearConfirmationOpen, isClearing, closeDrawer]);
+
+  useEffect(() => {
+    return () => {
+      if (clearTimerRef.current !== null) {
+        window.clearTimeout(clearTimerRef.current);
+      }
+    };
+  }, []);
+
+  function requestClearBooking() {
+    if (isClearing) {
+      return;
+    }
+
+    setIsClearConfirmationOpen(true);
+  }
+
+  function cancelClearBooking() {
+    if (isClearing) {
+      return;
+    }
+
+    setIsClearConfirmationOpen(false);
+  }
+
+  function confirmClearBooking() {
+    if (isClearing) {
+      return;
+    }
+
+    setIsClearing(true);
+
+    clearTimerRef.current = window.setTimeout(() => {
+      clearBooking();
+
+      setIsClearing(false);
+      setIsClearConfirmationOpen(false);
+
+      clearTimerRef.current = null;
+    }, 550);
+  }
 
   if (!isHydrated || !isDrawerOpen) {
     return null;
@@ -76,7 +161,8 @@ export default function BookingDrawer() {
       <button
         type="button"
         onClick={closeDrawer}
-        className="absolute inset-0 cursor-default bg-slate-950/50 backdrop-blur-[2px]"
+        disabled={isClearing}
+        className="absolute inset-0 cursor-default bg-slate-950/50 backdrop-blur-[2px] disabled:cursor-wait"
         aria-label="Close booking drawer"
       />
 
@@ -109,7 +195,8 @@ export default function BookingDrawer() {
           <button
             type="button"
             onClick={closeDrawer}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 sm:h-10 sm:w-10"
+            disabled={isClearing}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-wait disabled:opacity-40 sm:h-10 sm:w-10"
             aria-label="Close booking drawer"
           >
             <X className="h-4.5 w-4.5 sm:h-5 sm:w-5" aria-hidden="true" />
@@ -137,7 +224,7 @@ export default function BookingDrawer() {
             <Link
               href="/products"
               onClick={closeDrawer}
-              className="mt-6 inline-flex min-h-10 max-w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-amber-700 min-[380px]:mt-7 min-[380px]:h-11 min-[380px]:px-6 min-[380px]:text-sm"
+              className="mt-6 inline-flex min-h-10 max-w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-amber-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2 min-[380px]:mt-7 min-[380px]:h-11 min-[380px]:px-6 min-[380px]:text-sm"
             >
               <span>Browse products</span>
 
@@ -179,21 +266,91 @@ export default function BookingDrawer() {
               <Link
                 href="/booking"
                 onClick={closeDrawer}
-                className="flex min-h-10 w-full min-w-0 items-center justify-center gap-2 rounded-xl bg-amber-600 px-3 py-2 text-xs font-extrabold text-white shadow-sm transition hover:bg-amber-700 min-[380px]:h-12 min-[380px]:px-5 min-[380px]:text-sm"
+                className="flex min-h-10 w-full min-w-0 items-center justify-center gap-2 rounded-xl bg-amber-600 px-3 py-2 text-xs font-extrabold text-white shadow-sm transition hover:bg-amber-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2 min-[380px]:h-12 min-[380px]:px-5 min-[380px]:text-sm"
               >
                 <span>Review booking</span>
 
                 <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
               </Link>
 
-              <button
-                type="button"
-                onClick={clearBooking}
-                className="mt-1.5 flex h-9 w-full min-w-0 items-center justify-center gap-2 rounded-xl text-xs font-bold text-slate-500 transition hover:bg-red-50 hover:text-red-600 min-[380px]:mt-2 min-[380px]:h-10 min-[380px]:text-sm"
-              >
-                <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-                Clear booking
-              </button>
+              {isClearConfirmationOpen ? (
+                <div
+                  className="mt-2 rounded-xl border border-red-200 bg-red-50 p-3"
+                  role="alertdialog"
+                  aria-modal="true"
+                  aria-labelledby="clear-booking-title"
+                  aria-describedby="clear-booking-description"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle
+                      className="mt-0.5 h-4 w-4 shrink-0 text-red-600"
+                      aria-hidden="true"
+                    />
+
+                    <div className="min-w-0">
+                      <p
+                        id="clear-booking-title"
+                        className="text-xs font-black text-red-900 min-[380px]:text-sm"
+                      >
+                        Clear this booking?
+                      </p>
+
+                      <p
+                        id="clear-booking-description"
+                        className="mt-0.5 text-[10px] leading-4 text-red-700 min-[380px]:text-xs"
+                      >
+                        All {totalItems} selected{" "}
+                        {totalItems === 1 ? "product" : "products"} will be
+                        removed.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={cancelClearBooking}
+                      disabled={isClearing}
+                      className="flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-2 text-[10px] font-extrabold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:cursor-wait disabled:opacity-50 min-[380px]:text-xs"
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      ref={confirmButtonRef}
+                      type="button"
+                      onClick={confirmClearBooking}
+                      disabled={isClearing}
+                      className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-2 text-[10px] font-extrabold text-white transition hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:bg-red-500 min-[380px]:text-xs"
+                      aria-live="polite"
+                    >
+                      {isClearing ? (
+                        <>
+                          <LoaderCircle
+                            className="h-3.5 w-3.5 animate-spin"
+                            aria-hidden="true"
+                          />
+                          Clearing...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          Clear all
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={requestClearBooking}
+                  className="mt-1.5 flex h-9 w-full min-w-0 items-center justify-center gap-2 rounded-xl text-xs font-bold text-slate-500 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 min-[380px]:mt-2 min-[380px]:h-10 min-[380px]:text-sm"
+                >
+                  <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  Clear booking
+                </button>
+              )}
             </footer>
           </>
         )}
