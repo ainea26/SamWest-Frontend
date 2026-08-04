@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  AlertTriangle,
   ArrowRight,
   LoaderCircle,
   PackageOpen,
   ShoppingBasket,
   Trash2,
+  TriangleAlert,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -17,18 +17,11 @@ import BookingItem from "@/components/booking/BookingItem";
 import { useBooking } from "@/context/BookingContext";
 import { formatCurrency } from "@/lib/formatters";
 
+const DRAWER_TRANSITION_DURATION = 300;
+const CLEAR_FEEDBACK_DURATION = 550;
+
 export default function BookingDrawer() {
   const pathname = usePathname();
-
-  const previousPathnameRef = useRef(pathname);
-
-  const clearTimerRef = useRef<number | null>(null);
-
-  const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
-
-  const [isClearConfirmationOpen, setIsClearConfirmationOpen] = useState(false);
-
-  const [isClearing, setIsClearing] = useState(false);
 
   const {
     items,
@@ -42,13 +35,85 @@ export default function BookingDrawer() {
     closeDrawer,
   } = useBooking();
 
+  const previousPathnameRef = useRef(pathname);
+  const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
+  const entranceFrameRef = useRef<number | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
+  const clearTimerRef = useRef<number | null>(null);
+  const clearCompletionTimerRef = useRef<number | null>(null);
+
+  const [isClearConfirmationOpen, setIsClearConfirmationOpen] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const [isDrawerVisible, setIsDrawerVisible] = useState(false);
+  const [shouldRenderDrawer, setShouldRenderDrawer] = useState(isDrawerOpen);
+
   useEffect(() => {
     if (previousPathnameRef.current !== pathname) {
       previousPathnameRef.current = pathname;
-
       closeDrawer();
     }
   }, [pathname, closeDrawer]);
+
+  useEffect(() => {
+    if (entranceFrameRef.current !== null) {
+      window.cancelAnimationFrame(entranceFrameRef.current);
+      entranceFrameRef.current = null;
+    }
+
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+
+    if (isDrawerOpen) {
+      setShouldRenderDrawer(true);
+      setIsDrawerVisible(false);
+
+      entranceFrameRef.current = window.requestAnimationFrame(() => {
+        entranceFrameRef.current = window.requestAnimationFrame(() => {
+          setIsDrawerVisible(true);
+          entranceFrameRef.current = null;
+        });
+      });
+
+      return;
+    }
+
+    setIsDrawerVisible(false);
+
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    closeTimerRef.current = window.setTimeout(
+      () => {
+        setShouldRenderDrawer(false);
+        closeTimerRef.current = null;
+      },
+      prefersReducedMotion ? 0 : DRAWER_TRANSITION_DURATION,
+    );
+
+    return () => {
+      if (entranceFrameRef.current !== null) {
+        window.cancelAnimationFrame(entranceFrameRef.current);
+        entranceFrameRef.current = null;
+      }
+
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+    };
+  }, [isDrawerOpen]);
+
+  useEffect(() => {
+    if (shouldRenderDrawer) {
+      return;
+    }
+
+    setIsClearConfirmationOpen(false);
+    setIsClearing(false);
+  }, [shouldRenderDrawer]);
 
   useEffect(() => {
     if (isClearConfirmationOpen) {
@@ -57,22 +122,7 @@ export default function BookingDrawer() {
   }, [isClearConfirmationOpen]);
 
   useEffect(() => {
-    if (isDrawerOpen) {
-      return;
-    }
-
-    setIsClearConfirmationOpen(false);
-    setIsClearing(false);
-
-    if (clearTimerRef.current !== null) {
-      window.clearTimeout(clearTimerRef.current);
-
-      clearTimerRef.current = null;
-    }
-  }, [isDrawerOpen]);
-
-  useEffect(() => {
-    if (!isDrawerOpen) {
+    if (!shouldRenderDrawer) {
       return;
     }
 
@@ -81,11 +131,7 @@ export default function BookingDrawer() {
     document.body.style.overflow = "hidden";
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape") {
-        return;
-      }
-
-      if (isClearing) {
+      if (event.key !== "Escape" || isClearing) {
         return;
       }
 
@@ -101,15 +147,26 @@ export default function BookingDrawer() {
 
     return () => {
       document.body.style.overflow = previousOverflow;
-
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isDrawerOpen, isClearConfirmationOpen, isClearing, closeDrawer]);
+  }, [shouldRenderDrawer, isClearConfirmationOpen, isClearing, closeDrawer]);
 
   useEffect(() => {
     return () => {
+      if (entranceFrameRef.current !== null) {
+        window.cancelAnimationFrame(entranceFrameRef.current);
+      }
+
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+
       if (clearTimerRef.current !== null) {
         window.clearTimeout(clearTimerRef.current);
+      }
+
+      if (clearCompletionTimerRef.current !== null) {
+        window.clearTimeout(clearCompletionTimerRef.current);
       }
     };
   }, []);
@@ -138,16 +195,27 @@ export default function BookingDrawer() {
     setIsClearing(true);
 
     clearTimerRef.current = window.setTimeout(() => {
-      clearBooking();
-
-      setIsClearing(false);
-      setIsClearConfirmationOpen(false);
-
+      setIsDrawerVisible(false);
       clearTimerRef.current = null;
-    }, 550);
+
+      const prefersReducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+
+      clearCompletionTimerRef.current = window.setTimeout(
+        () => {
+          clearBooking();
+          setShouldRenderDrawer(false);
+          setIsClearing(false);
+          setIsClearConfirmationOpen(false);
+          clearCompletionTimerRef.current = null;
+        },
+        prefersReducedMotion ? 0 : DRAWER_TRANSITION_DURATION,
+      );
+    }, CLEAR_FEEDBACK_DURATION);
   }
 
-  if (!isHydrated || !isDrawerOpen) {
+  if (!isHydrated || !shouldRenderDrawer) {
     return null;
   }
 
@@ -162,11 +230,20 @@ export default function BookingDrawer() {
         type="button"
         onClick={closeDrawer}
         disabled={isClearing}
-        className="absolute inset-0 cursor-default bg-slate-950/50 backdrop-blur-[2px] disabled:cursor-wait"
+        className={[
+          "absolute inset-0 cursor-default bg-slate-950/50 backdrop-blur-[2px] transition-opacity duration-300 disabled:cursor-wait motion-reduce:transition-none",
+          isDrawerVisible ? "opacity-100" : "pointer-events-none opacity-0",
+        ].join(" ")}
         aria-label="Close booking drawer"
       />
 
-      <aside className="absolute inset-y-0 right-0 flex h-dvh w-full min-w-0 max-w-105 flex-col overflow-hidden bg-white shadow-2xl">
+      <aside
+        className={[
+          "absolute inset-y-0 right-0 flex h-dvh w-full min-w-0 max-w-105 flex-col overflow-hidden bg-white shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none",
+          isDrawerVisible ? "translate-x-0" : "translate-x-full",
+        ].join(" ")}
+        aria-hidden={!isDrawerVisible}
+      >
         <header className="flex min-w-0 shrink-0 items-center justify-between gap-2 border-b border-slate-200 px-3 pb-3 pt-[max(12px,env(safe-area-inset-top))] min-[380px]:px-4 sm:px-6 sm:py-4">
           <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 min-[380px]:h-10 min-[380px]:w-10 sm:h-11 sm:w-11 sm:rounded-2xl">
@@ -227,7 +304,6 @@ export default function BookingDrawer() {
               className="mt-6 inline-flex min-h-10 max-w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-amber-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2 min-[380px]:mt-7 min-[380px]:h-11 min-[380px]:px-6 min-[380px]:text-sm"
             >
               <span>Browse products</span>
-
               <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
             </Link>
           </div>
@@ -269,39 +345,37 @@ export default function BookingDrawer() {
                 className="flex min-h-10 w-full min-w-0 items-center justify-center gap-2 rounded-xl bg-amber-600 px-3 py-2 text-xs font-extrabold text-white shadow-sm transition hover:bg-amber-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2 min-[380px]:h-12 min-[380px]:px-5 min-[380px]:text-sm"
               >
                 <span>Review booking</span>
-
                 <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
               </Link>
 
               {isClearConfirmationOpen ? (
                 <div
-                  className="mt-2 rounded-xl border border-red-200 bg-red-50 p-3"
+                  className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 sm:rounded-2xl sm:p-4"
                   role="alertdialog"
                   aria-modal="true"
-                  aria-labelledby="clear-booking-title"
-                  aria-describedby="clear-booking-description"
+                  aria-labelledby="drawer-clear-booking-title"
+                  aria-describedby="drawer-clear-booking-description"
                 >
-                  <div className="flex items-start gap-2.5">
-                    <AlertTriangle
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <TriangleAlert
                       className="mt-0.5 h-4 w-4 shrink-0 text-red-600"
                       aria-hidden="true"
                     />
 
                     <div className="min-w-0">
                       <p
-                        id="clear-booking-title"
-                        className="text-xs font-black text-red-900 min-[380px]:text-sm"
+                        id="drawer-clear-booking-title"
+                        className="text-xs font-black text-red-900 sm:text-sm"
                       >
-                        Clear this booking?
+                        Clear the entire booking?
                       </p>
 
                       <p
-                        id="clear-booking-description"
-                        className="mt-0.5 text-[10px] leading-4 text-red-700 min-[380px]:text-xs"
+                        id="drawer-clear-booking-description"
+                        className="mt-1 text-[10px] leading-4 text-red-700 sm:text-xs sm:leading-5"
                       >
-                        All {totalItems} selected{" "}
-                        {totalItems === 1 ? "product" : "products"} will be
-                        removed.
+                        All selected products will be removed. This action
+                        cannot be undone.
                       </p>
                     </div>
                   </div>
@@ -311,7 +385,7 @@ export default function BookingDrawer() {
                       type="button"
                       onClick={cancelClearBooking}
                       disabled={isClearing}
-                      className="flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-2 text-[10px] font-extrabold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:cursor-wait disabled:opacity-50 min-[380px]:text-xs"
+                      className="flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-2 text-[10px] font-extrabold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:cursor-wait disabled:opacity-50 sm:text-xs"
                     >
                       Cancel
                     </button>
@@ -321,7 +395,7 @@ export default function BookingDrawer() {
                       type="button"
                       onClick={confirmClearBooking}
                       disabled={isClearing}
-                      className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-2 text-[10px] font-extrabold text-white transition hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:bg-red-500 min-[380px]:text-xs"
+                      className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-2 text-[10px] font-extrabold text-white transition hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:bg-red-500 sm:text-xs"
                       aria-live="polite"
                     >
                       {isClearing ? (
@@ -345,7 +419,8 @@ export default function BookingDrawer() {
                 <button
                   type="button"
                   onClick={requestClearBooking}
-                  className="mt-1.5 flex h-9 w-full min-w-0 items-center justify-center gap-2 rounded-xl text-xs font-bold text-slate-500 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 min-[380px]:mt-2 min-[380px]:h-10 min-[380px]:text-sm"
+                  disabled={isClearing}
+                  className="mt-2 flex h-10 w-full min-w-0 items-center justify-center gap-2 rounded-xl text-xs font-bold text-slate-500 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-wait disabled:opacity-50 sm:text-sm"
                 >
                   <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
                   Clear booking

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check, ImageIcon, Star } from "lucide-react";
+import { Check, ImageIcon, LoaderCircle, Star } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { useBooking } from "@/context/BookingContext";
@@ -11,6 +11,8 @@ import type { Product } from "@/types/product";
 type ProductCardProps = {
   product: Product;
 };
+
+type AddState = "idle" | "adding" | "added";
 
 function getImageUrl(image: string | null | undefined): string | null {
   if (!image) {
@@ -41,13 +43,17 @@ function getImageUrl(image: string | null | undefined): string | null {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const { addItem } = useBooking();
+const { addItem } = useBooking();
 
-  const [imageFailed, setImageFailed] = useState(false);
+const [imageFailed, setImageFailed] = useState(false);
 
-  const [justAdded, setJustAdded] = useState(false);
+const [addState, setAddState] = useState<AddState>("idle");
 
-  const addedTimeoutRef = useRef<number | null>(null);
+const addTimerRef = useRef<number | null>(null);
+
+const confirmationTimerRef = useRef<number | null>(null);
+
+const isAdding = addState === "adding";
 
   const imageUrl = getImageUrl(product.image_url || product.image);
 
@@ -63,35 +69,51 @@ export default function ProductCard({ product }: ProductCardProps) {
     setImageFailed(false);
   }, [imageUrl]);
 
-  useEffect(() => {
-    return () => {
-      if (addedTimeoutRef.current !== null) {
-        window.clearTimeout(addedTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  function handleAddToBooking() {
-    if (!product.is_available) {
-      return;
+useEffect(() => {
+  return () => {
+    if (addTimerRef.current !== null) {
+      window.clearTimeout(addTimerRef.current);
     }
 
-    addItem(product, 1);
-    setJustAdded(true);
-
-    if (addedTimeoutRef.current !== null) {
-      window.clearTimeout(addedTimeoutRef.current);
+    if (confirmationTimerRef.current !== null) {
+      window.clearTimeout(confirmationTimerRef.current);
     }
+  };
+}, []);
 
-    addedTimeoutRef.current = window.setTimeout(() => {
-      setJustAdded(false);
-      addedTimeoutRef.current = null;
-    }, 1400);
+function handleAddToBooking() {
+  if (!product.is_available || isAdding) {
+    return;
   }
 
-  const buttonText = !product.is_available
-    ? "Unavailable"
-    : justAdded
+  setAddState("adding");
+
+  if (addTimerRef.current !== null) {
+    window.clearTimeout(addTimerRef.current);
+  }
+
+  addTimerRef.current = window.setTimeout(() => {
+    addItem(product, 1);
+
+    setAddState("added");
+    addTimerRef.current = null;
+
+    if (confirmationTimerRef.current !== null) {
+      window.clearTimeout(confirmationTimerRef.current);
+    }
+
+    confirmationTimerRef.current = window.setTimeout(() => {
+      setAddState("idle");
+      confirmationTimerRef.current = null;
+    }, 1400);
+  }, 400);
+}
+
+const buttonText = !product.is_available
+  ? "Unavailable"
+  : addState === "adding"
+    ? "Adding..."
+    : addState === "added"
       ? "Added"
       : "Add to booking";
 
@@ -203,21 +225,29 @@ export default function ProductCard({ product }: ProductCardProps) {
               </p>
             ) : null}
           </div>
-
           <button
             type="button"
             onClick={handleAddToBooking}
-            disabled={!product.is_available}
+            disabled={!product.is_available || isAdding}
             className={[
-              "mt-2.5 flex min-h-9 w-full min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-center text-[10px] font-extrabold leading-4 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2 active:scale-[0.98] sm:mt-3 sm:min-h-10 sm:text-xs",
-              justAdded
+              "mt-2.5 flex min-h-9 w-full min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-center text-[10px] font-extrabold leading-4 transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2 active:scale-[0.98] disabled:cursor-wait sm:mt-3 sm:min-h-10 sm:text-xs",
+              addState === "added"
                 ? "bg-emerald-600 text-white"
-                : "bg-amber-500 text-slate-950 hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400",
+                : addState === "adding"
+                  ? "bg-amber-400 text-slate-950"
+                  : "bg-amber-500 text-slate-950 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400",
             ].join(" ")}
             aria-label={`${buttonText}: ${product.name}`}
             aria-live="polite"
           >
-            {justAdded ? (
+            {addState === "adding" ? (
+              <LoaderCircle
+                className="h-3.5 w-3.5 shrink-0 animate-spin"
+                aria-hidden="true"
+              />
+            ) : null}
+
+            {addState === "added" ? (
               <Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             ) : null}
 
