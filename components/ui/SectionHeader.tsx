@@ -18,23 +18,23 @@ export default function SectionHeader({
   return (
     <div
       className={cn(
-        "mb-5 flex items-end justify-between gap-4 sm:mb-7",
+        "mb-5 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5 sm:mb-7 sm:gap-x-5 sm:gap-y-2",
         className,
       )}
     >
-      <div className="min-w-0">
-        <h2 className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl lg:text-3xl">
-          {title}
-        </h2>
+      <h2 className="min-w-0 text-[clamp(1.25rem,5vw,1.875rem)] font-black leading-[1.15] tracking-tight text-slate-950">
+        {title}
+      </h2>
 
-        {description ? (
-          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-            {description}
-          </p>
-        ) : null}
-      </div>
+      {action ? (
+        <div className="shrink-0 self-center whitespace-nowrap">{action}</div>
+      ) : null}
 
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {description ? (
+        <p className="col-span-full max-w-2xl text-pretty text-[13px] leading-[1.55] text-slate-600 sm:text-[15px] sm:leading-6">
+          {description}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
-
 import { Geist, Geist_Mono } from "next/font/google";
-
 import type { ReactNode } from "react";
 
 import "./globals.css";
@@ -47,7 +45,6 @@ export const metadata: Metadata = {
 
   creator: "SamWest",
   publisher: "SamWest",
-
   category: "shopping",
 
   formatDetection: {
@@ -80,7 +77,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" className="min-w-0">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} min-h-dvh min-w-0 bg-white text-slate-950 antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} min-h-dvh min-w-0 overflow-x-hidden bg-white text-slate-950 antialiased`}
       >
         <Providers>{children}</Providers>
       </body>
