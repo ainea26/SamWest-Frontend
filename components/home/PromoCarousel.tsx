@@ -28,9 +28,9 @@ type PromoCarouselProps = {
   products: Product[];
 };
 
-const AUTO_PLAY_DELAY = 4000;
-const TRANSITION_DURATION = 700;
-const RESET_FALLBACK_DELAY = TRANSITION_DURATION + 200;
+const AUTO_PLAY_DELAY = 4500;
+const TRANSITION_DURATION = 650;
+const RESET_FALLBACK_DELAY = TRANSITION_DURATION + 250;
 
 const campaigns = [
   {
@@ -86,7 +86,14 @@ function getImageUrl(image: string | null | undefined): string | null {
     return image;
   }
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8001/api";
+  const developmentApiUrl = "http://127.0.0.1:8001/api";
+  const productionApiUrl = "https://samwest-production.up.railway.app/api";
+
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL?.trim() ||
+    (process.env.NODE_ENV === "production"
+      ? productionApiUrl
+      : developmentApiUrl);
 
   const backendUrl = apiUrl.replace(/\/api\/?$/, "");
 
@@ -104,11 +111,7 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
   );
 
   const extendedSlides = useMemo(() => {
-    if (slides.length === 0) {
-      return [];
-    }
-
-    if (slides.length === 1) {
+    if (slides.length <= 1) {
       return slides;
     }
 
@@ -118,15 +121,12 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
   const initialPosition = slides.length > 1 ? 1 : 0;
 
   const [slidePosition, setSlidePosition] = useState(initialPosition);
-
   const [transitionEnabled, setTransitionEnabled] = useState(true);
-
   const [isPaused, setIsPaused] = useState(false);
   const [isDocumentHidden, setIsDocumentHidden] = useState(false);
 
   const positionRef = useRef(initialPosition);
   const isAnimatingRef = useRef(false);
-
   const resetTimeoutRef = useRef<number | null>(null);
   const firstFrameRef = useRef<number | null>(null);
   const secondFrameRef = useRef<number | null>(null);
@@ -157,7 +157,6 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
       secondFrameRef.current = window.requestAnimationFrame(() => {
         setTransitionEnabled(true);
         isAnimatingRef.current = false;
-
         firstFrameRef.current = null;
         secondFrameRef.current = null;
       });
@@ -175,7 +174,6 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
       }
 
       const currentPosition = positionRef.current;
-
       let normalizedPosition = currentPosition;
 
       if (currentPosition <= 0) {
@@ -186,10 +184,8 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
 
       if (normalizedPosition !== currentPosition || force) {
         setTransitionEnabled(false);
-
         positionRef.current = normalizedPosition;
         setSlidePosition(normalizedPosition);
-
         enableTransitionAfterJump();
         return;
       }
@@ -198,11 +194,6 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
     },
     [enableTransitionAfterJump, slides.length],
   );
-
-  const finishMovement = useCallback(() => {
-    clearResetTimeout();
-    normalizePosition();
-  }, [clearResetTimeout, normalizePosition]);
 
   const scheduleMovementFallback = useCallback(() => {
     clearResetTimeout();
@@ -235,26 +226,24 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
 
       isAnimatingRef.current = true;
       positionRef.current = nextPosition;
-
       setTransitionEnabled(true);
       setSlidePosition(nextPosition);
-
       scheduleMovementFallback();
     },
     [scheduleMovementFallback, slides.length],
   );
 
-  const showPrevious = useCallback(() => {
-    moveBy(-1);
-  }, [moveBy]);
-
-  const showNext = useCallback(() => {
-    moveBy(1);
-  }, [moveBy]);
+  const showPrevious = useCallback(() => moveBy(-1), [moveBy]);
+  const showNext = useCallback(() => moveBy(1), [moveBy]);
 
   const showSlide = useCallback(
     (index: number) => {
-      if (slides.length <= 1 || index < 0 || index >= slides.length) {
+      if (
+        slides.length <= 1 ||
+        index < 0 ||
+        index >= slides.length ||
+        isAnimatingRef.current
+      ) {
         return;
       }
 
@@ -265,10 +254,8 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
 
       isAnimatingRef.current = true;
       positionRef.current = nextPosition;
-
       setTransitionEnabled(true);
       setSlidePosition(nextPosition);
-
       scheduleMovementFallback();
     },
     [
@@ -287,7 +274,6 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
 
     positionRef.current = nextPosition;
     isAnimatingRef.current = false;
-
     setTransitionEnabled(false);
     setSlidePosition(nextPosition);
 
@@ -319,7 +305,6 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
     }
 
     setIsDocumentHidden(document.hidden);
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
@@ -332,13 +317,9 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
-      showNext();
-    }, AUTO_PLAY_DELAY);
+    const timeoutId = window.setTimeout(showNext, AUTO_PLAY_DELAY);
 
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
+    return () => window.clearTimeout(timeoutId);
   }, [isDocumentHidden, isPaused, showNext, slidePosition, slides.length]);
 
   useEffect(() => {
@@ -365,14 +346,18 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
       return;
     }
 
-    finishMovement();
+    clearResetTimeout();
+    normalizePosition();
   }
 
   return (
-    <section className="py-4 sm:py-5" aria-label="SamWest promotions">
+    <section
+      className="py-[clamp(0.75rem,3vw,1.25rem)]"
+      aria-label="SamWest promotions"
+    >
       <Container>
         <div
-          className="group relative overflow-hidden rounded-2xl bg-slate-950 shadow-lg"
+          className="group relative isolate min-w-0 overflow-hidden rounded-2xl bg-slate-950 shadow-lg"
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
           onFocusCapture={() => setIsPaused(true)}
@@ -390,60 +375,61 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
           <div
             className={
               transitionEnabled
-                ? "flex transition-transform duration-700 ease-in-out"
+                ? "flex transition-transform ease-in-out"
                 : "flex"
             }
             style={{
               transform: `translate3d(-${slidePosition * 100}%, 0, 0)`,
+              transitionDuration: transitionEnabled
+                ? `${TRANSITION_DURATION}ms`
+                : "0ms",
               willChange: "transform",
             }}
             onTransitionEnd={handleTransitionEnd}
           >
             {extendedSlides.map(({ product, campaign }, index) => {
               const CampaignIcon = campaign.icon;
-
               const imageUrl = getImageUrl(product.image_url || product.image);
 
               return (
                 <article
                   key={`${product.id}-${index}`}
-                  className={`relative flex h-57.5 w-full shrink-0 overflow-hidden bg-linear-to-r ${campaign.background} text-white sm:h-67.5 lg:h-72.5`}
+                  className={`relative flex h-[clamp(13.5rem,58vw,16rem)] w-full shrink-0 overflow-hidden bg-linear-to-r ${campaign.background} text-white sm:h-68 lg:h-72`}
                   aria-hidden={slides.length > 1 && index !== slidePosition}
                 >
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_30%,rgba(255,255,255,0.2),transparent_34%)]" />
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_28%,rgba(255,255,255,0.2),transparent_36%)]" />
 
-                  <div className="relative grid h-full w-full grid-cols-[minmax(0,1fr)_120px] items-center gap-3 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_220px] sm:px-10 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-14">
-                    <div className="min-w-0">
-                      <div className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] backdrop-blur-sm sm:text-[10px]">
+                  <div className="relative grid h-full w-full min-w-0 grid-cols-[minmax(0,1fr)_minmax(5.75rem,32%)] items-center gap-[clamp(0.5rem,2.5vw,1.25rem)] px-[clamp(1rem,4vw,2.5rem)] py-4 sm:grid-cols-[minmax(0,1fr)_minmax(11rem,27%)] sm:py-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:px-14">
+                    <div className="min-w-0 pb-5 sm:pb-0">
+                      <div className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.12em] backdrop-blur-sm sm:text-[10px]">
                         <CampaignIcon
-                          className="h-3.5 w-3.5"
+                          className="h-3.5 w-3.5 shrink-0"
                           aria-hidden="true"
                         />
-
-                        {campaign.eyebrow}
+                        <span className="truncate">{campaign.eyebrow}</span>
                       </div>
 
-                      <h2 className="mt-3 max-w-2xl text-2xl font-black leading-tight tracking-tight sm:text-3xl lg:text-4xl">
+                      <h2 className="mt-2.5 max-w-2xl text-balance text-[clamp(1.15rem,5.4vw,2.5rem)] font-black leading-[1.08] tracking-tight sm:mt-3">
                         {campaign.title}
                       </h2>
 
-                      <p className="mt-2 hidden max-w-xl text-xs leading-5 text-white/80 min-[430px]:block sm:text-sm sm:leading-6">
+                      <p className="mt-2 hidden max-w-xl text-pretty text-sm leading-6 text-white/80 min-[430px]:block">
                         {campaign.description}
                       </p>
 
-                      <div className="mt-4 flex flex-wrap items-center gap-2 sm:mt-5">
+                      <div className="mt-3 flex min-w-0 flex-wrap items-center gap-1.5 sm:mt-5 sm:gap-2">
                         <Link
                           href={`/products/${product.slug}`}
-                          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-white px-3 text-[10px] font-black text-slate-950 transition hover:bg-amber-100 sm:h-10 sm:px-4 sm:text-xs"
+                          className="inline-flex h-9 shrink-0 items-center justify-center gap-1 rounded-lg bg-white px-2.5 text-[9px] font-black text-slate-950 transition hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-white sm:h-10 sm:gap-1.5 sm:px-4 sm:text-xs"
                         >
                           View product
                           <ArrowRight
-                            className="h-3.5 w-3.5"
+                            className="h-3.5 w-3.5 shrink-0"
                             aria-hidden="true"
                           />
                         </Link>
 
-                        <span className="rounded-lg bg-black/20 px-3 py-2 text-[10px] font-black backdrop-blur-sm sm:text-xs">
+                        <span className="max-w-full truncate rounded-lg bg-black/20 px-2 py-2 text-[9px] font-black backdrop-blur-sm sm:px-3 sm:text-xs">
                           {formatCurrency(product.price)}
                         </span>
                       </div>
@@ -451,24 +437,28 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
 
                     <Link
                       href={`/products/${product.slug}`}
-                      className="relative flex h-42.5 items-center justify-center overflow-hidden rounded-xl border border-white/30 bg-white/95 p-2 shadow-xl sm:h-53.75 sm:rounded-2xl sm:p-4 lg:h-60"
+                      className="relative flex h-[clamp(8rem,40vw,11rem)] min-w-0 items-center justify-center overflow-hidden rounded-xl border border-white/30 bg-white/95 p-2 shadow-xl sm:h-52 sm:rounded-2xl sm:p-4 lg:h-60"
                       aria-label={`View ${product.name}`}
+                      tabIndex={
+                        slides.length > 1 && index !== slidePosition ? -1 : 0
+                      }
                     >
                       {imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={imageUrl}
                           alt={product.name}
-                          className="h-full w-full object-contain"
+                          className="h-full w-full max-w-full object-contain"
                           loading={index <= 2 ? "eager" : "lazy"}
+                          decoding="async"
                         />
                       ) : (
-                        <span className="text-center text-xs font-bold text-slate-400">
+                        <span className="text-center text-[10px] font-bold text-slate-400 sm:text-xs">
                           No image
                         </span>
                       )}
 
-                      <span className="absolute inset-x-2 bottom-2 line-clamp-1 rounded-md bg-slate-950/85 px-2 py-1.5 text-center text-[9px] font-bold text-white backdrop-blur-sm sm:inset-x-3 sm:bottom-3 sm:text-[10px]">
+                      <span className="absolute inset-x-1.5 bottom-1.5 line-clamp-2 rounded-md bg-slate-950/85 px-1.5 py-1 text-center text-[8px] font-bold leading-3 text-white backdrop-blur-sm sm:inset-x-3 sm:bottom-3 sm:px-2 sm:py-1.5 sm:text-[10px] sm:leading-4">
                         {product.name}
                       </span>
                     </Link>
@@ -483,7 +473,8 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
               <button
                 type="button"
                 onClick={showPrevious}
-                className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-slate-950 opacity-0 shadow-md backdrop-blur transition hover:bg-white group-hover:opacity-100 focus:opacity-100 sm:left-3 sm:h-9 sm:w-9"
+                disabled={isAnimatingRef.current}
+                className="absolute left-1.5 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-slate-950 shadow-md backdrop-blur transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white sm:left-3 sm:h-9 sm:w-9 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
                 aria-label="Previous promotion"
               >
                 <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -492,13 +483,14 @@ export default function PromoCarousel({ products }: PromoCarouselProps) {
               <button
                 type="button"
                 onClick={showNext}
-                className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-slate-950 opacity-0 shadow-md backdrop-blur transition hover:bg-white group-hover:opacity-100 focus:opacity-100 sm:right-3 sm:h-9 sm:w-9"
+                disabled={isAnimatingRef.current}
+                className="absolute right-1.5 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-slate-950 shadow-md backdrop-blur transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white sm:right-3 sm:h-9 sm:w-9 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
                 aria-label="Next promotion"
               >
                 <ChevronRight className="h-4 w-4" aria-hidden="true" />
               </button>
 
-              <div className="absolute bottom-2.5 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/20 px-2.5 py-1.5 backdrop-blur-sm sm:bottom-3">
+              <div className="absolute bottom-2.5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/25 px-2.5 py-1.5 backdrop-blur-sm sm:bottom-3">
                 {slides.map((slide, index) => (
                   <button
                     key={slide.product.id}
