@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ExternalLink,
   FileText,
+  LoaderCircle,
   MapPin,
   MessageCircle,
   PackageOpen,
@@ -16,7 +17,9 @@ import {
   TriangleAlert,
   UserRound,
 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+
+
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import BookingItem from "@/components/booking/BookingItem";
 import Container from "@/components/ui/Container";
@@ -107,6 +110,56 @@ export default function BookingPage() {
 
   const [bookingResponse, setBookingResponse] =
     useState<WhatsAppBookingResponse | null>(null);
+
+
+    const [isClearConfirmationOpen, setIsClearConfirmationOpen] =
+      useState(false);
+
+    const [isClearing, setIsClearing] = useState(false);
+
+    const clearTimerRef = useRef<number | null>(null);
+
+    useEffect(() => {
+      return () => {
+        if (clearTimerRef.current !== null) {
+          window.clearTimeout(clearTimerRef.current);
+        }
+      };
+    }, []);
+
+    function requestClearBooking(): void {
+      if (isClearing || isSubmitting) {
+        return;
+      }
+
+      setIsClearConfirmationOpen(true);
+    }
+
+    function cancelClearBooking(): void {
+      if (isClearing) {
+        return;
+      }
+
+      setIsClearConfirmationOpen(false);
+    }
+
+    function confirmClearBooking(): void {
+      if (isClearing || isSubmitting) {
+        return;
+      }
+
+      setIsClearing(true);
+
+      clearTimerRef.current = window.setTimeout(() => {
+        clearBooking();
+        setErrorMessage("");
+        setUnavailableProductIds([]);
+        setIsClearing(false);
+        setIsClearConfirmationOpen(false);
+
+        clearTimerRef.current = null;
+      }, 550);
+    }
 
   function updateCustomerField(
     field: keyof CustomerDetails,
@@ -527,24 +580,84 @@ export default function BookingPage() {
 
         <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-7">
           <section className="min-w-0">
-            <div className="mb-3 flex min-w-0 items-center justify-between gap-2 sm:mb-4 sm:gap-4">
-              <h2 className="min-w-0 wrap-break-word text-sm font-black text-slate-950 min-[380px]:text-base sm:text-lg">
-                Selected products
-              </h2>
+            <div className="mb-3 min-w-0 sm:mb-4">
+              <div className="flex min-w-0 items-center justify-between gap-2 sm:gap-4">
+                <h2 className="min-w-0 wrap-break-word text-sm font-black text-slate-950 min-[380px]:text-base sm:text-lg">
+                  Selected products
+                </h2>
 
-              <button
-                type="button"
-                onClick={() => {
-                  clearBooking();
-                  setErrorMessage("");
-                  setUnavailableProductIds([]);
-                }}
-                className="inline-flex shrink-0 items-center gap-1 text-[10px] font-extrabold text-red-600 transition hover:text-red-700 min-[380px]:gap-1.5 min-[380px]:text-xs"
-              >
-                <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {!isClearConfirmationOpen ? (
+                  <button
+                    type="button"
+                    onClick={requestClearBooking}
+                    disabled={isSubmitting}
+                    className="inline-flex shrink-0 items-center gap-1 text-[10px] font-extrabold text-red-600 transition hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:cursor-not-allowed disabled:opacity-50 min-[380px]:gap-1.5 min-[380px]:text-xs"
+                  >
+                    <Trash2
+                      className="h-3.5 w-3.5 shrink-0"
+                      aria-hidden="true"
+                    />
 
-                <span>Clear booking</span>
-              </button>
+                    <span>Clear booking</span>
+                  </button>
+                ) : null}
+              </div>
+
+              {isClearConfirmationOpen ? (
+                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 sm:rounded-2xl sm:p-4">
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <TriangleAlert
+                      className="mt-0.5 h-4 w-4 shrink-0 text-red-600"
+                      aria-hidden="true"
+                    />
+
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-red-900 sm:text-sm">
+                        Clear the entire booking?
+                      </p>
+
+                      <p className="mt-1 text-[10px] leading-4 text-red-700 sm:text-xs sm:leading-5">
+                        All selected products will be removed. This action
+                        cannot be undone.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={cancelClearBooking}
+                      disabled={isClearing}
+                      className="flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-2 text-[10px] font-extrabold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 disabled:cursor-wait disabled:opacity-50 sm:text-xs"
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={confirmClearBooking}
+                      disabled={isClearing}
+                      className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-2 text-[10px] font-extrabold text-white transition hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:bg-red-500 sm:text-xs"
+                      aria-live="polite"
+                    >
+                      {isClearing ? (
+                        <>
+                          <LoaderCircle
+                            className="h-3.5 w-3.5 animate-spin"
+                            aria-hidden="true"
+                          />
+                          Clearing...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          Clear all
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="min-w-0 space-y-2.5 sm:space-y-4">
