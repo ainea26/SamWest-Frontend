@@ -3,15 +3,14 @@
 import NextTopLoader from "nextjs-toploader";
 import type { ReactNode } from "react";
 
+import WhatsAppFloat from "@/components/ui/WhatsAppFloat";
 import { BookingProvider } from "@/context/BookingContext";
 
 type ProvidersProps = {
   children: ReactNode;
 };
 
-export default function Providers({
-  children,
-}: ProvidersProps) {
+export default function Providers({ children }: ProvidersProps) {
   return (
     <BookingProvider>
       <NextTopLoader
@@ -27,6 +26,8 @@ export default function Providers({
       />
 
       {children}
+
+      <WhatsAppFloat />
     </BookingProvider>
   );
 }
