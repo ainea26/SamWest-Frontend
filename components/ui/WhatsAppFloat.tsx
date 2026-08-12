@@ -3,7 +3,7 @@
 import { MessageCircle } from "lucide-react";
 import { usePathname } from "next/navigation";
 
-const WHATSAPP_NUMBER = "254756348344";
+const WHATSAPP_NUMBER = "254739353972";
 
 const WHATSAPP_MESSAGE = "Hello SamWest, I would like some assistance.";
 
