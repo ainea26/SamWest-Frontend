@@ -1,84 +1,93 @@
-import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import "./globals.css";
+
 import Providers from "./providers";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-  display: "swap",
-});
+const SITE_URL = "https://samwestonline.com";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+
   title: {
-    default: "SamWest | Smart Shopping, Easy Booking",
+    default: "SamWest | Online Supermarket in Kenya",
     template: "%s | SamWest",
   },
 
   description:
-    "Browse selected products, save more, and send your booking to SamWest through WhatsApp for confirmation.",
+    "Shop groceries, household essentials, food, drinks, personal care products and more online from SamWest in Kenya.",
 
   applicationName: "SamWest",
 
   keywords: [
     "SamWest",
-    "online shopping Kenya",
+    "online supermarket Kenya",
+    "online grocery shopping Kenya",
     "groceries Kenya",
-    "household products",
-    "WhatsApp booking",
-    "smart shopping",
+    "supermarket Kenya",
+    "household products Kenya",
+    "food shopping Kenya",
+    "shop online Kenya",
   ],
 
   authors: [
     {
       name: "SamWest",
+      url: SITE_URL,
     },
   ],
 
   creator: "SamWest",
   publisher: "SamWest",
-  category: "shopping",
 
-  formatDetection: {
-    email: false,
-    address: false,
-    telephone: false,
+  alternates: {
+    canonical: "/",
+  },
+
+  openGraph: {
+    type: "website",
+    locale: "en_KE",
+    url: SITE_URL,
+    siteName: "SamWest",
+    title: "SamWest | Online Supermarket in Kenya",
+    description:
+      "Shop groceries, household essentials, food, drinks and more online from SamWest in Kenya.",
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    title: "SamWest | Online Supermarket in Kenya",
+    description:
+      "Shop groceries, household essentials, food, drinks and more online from SamWest in Kenya.",
   },
 
   robots: {
     index: true,
     follow: true,
+
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+
+  icons: {
+    icon: "/icon.svg",
   },
 };
 
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 5,
-  userScalable: true,
-  viewportFit: "cover",
-  themeColor: "#f59e0b",
-  colorScheme: "light",
-};
-
-type RootLayoutProps = {
+type RootLayoutProps = Readonly<{
   children: ReactNode;
-};
+}>;
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="en" className="min-w-0">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} min-h-dvh min-w-0 overflow-x-hidden bg-white text-slate-950 antialiased`}
-      >
+    <html lang="en">
+      <body>
         <Providers>{children}</Providers>
       </body>
     </html>

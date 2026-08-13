@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -11,13 +12,87 @@ import DealsSection from "@/components/home/DealsSection";
 import FeaturedProducts from "@/components/home/FeaturedProducts";
 import NewArrivals from "@/components/home/NewArrivals";
 import PopularProducts from "@/components/home/PopularProducts";
+import PromoCarousel from "@/components/home/PromoCarousel";
 import Container from "@/components/ui/Container";
 import { getHomepageProducts, getProducts, unwrapResults } from "@/lib/api";
 import type { HomepageProducts } from "@/types/product";
-import PromoCarousel from "@/components/home/PromoCarousel";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+const SITE_URL = "https://samwestonline.com";
+
+export const metadata: Metadata = {
+  title: "Online Supermarket in Kenya",
+  description:
+    "Shop groceries, household essentials, food, drinks, personal care products and more online from SamWest in Kenya.",
+
+  alternates: {
+    canonical: SITE_URL,
+  },
+
+  openGraph: {
+    type: "website",
+    locale: "en_KE",
+    url: SITE_URL,
+    siteName: "SamWest",
+    title: "SamWest | Online Supermarket in Kenya",
+    description:
+      "Shop groceries, household essentials, food, drinks and more online from SamWest in Kenya.",
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    title: "SamWest | Online Supermarket in Kenya",
+    description:
+      "Shop groceries, household essentials, food, drinks and more online from SamWest in Kenya.",
+  },
+
+  robots: {
+    index: true,
+    follow: true,
+
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+};
+
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "@id": `${SITE_URL}/#organization`,
+  name: "SamWest",
+  url: SITE_URL,
+  logo: `${SITE_URL}/icon.svg`,
+};
+
+const websiteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "@id": `${SITE_URL}/#website`,
+  url: SITE_URL,
+  name: "SamWest",
+  publisher: {
+    "@id": `${SITE_URL}/#organization`,
+  },
+  potentialAction: {
+    "@type": "SearchAction",
+    target: {
+      "@type": "EntryPoint",
+      urlTemplate: `${SITE_URL}/products?search={search_term_string}`,
+    },
+    "query-input": "required name=search_term_string",
+  },
+};
+
+function serializeJsonLd(value: object): string {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
 
 const emptyHomepage: HomepageProducts = {
   featured: [],
@@ -27,16 +102,16 @@ const emptyHomepage: HomepageProducts = {
 };
 
 export default async function HomePage() {
-const [homepageResult, fallbackProductsResult] = await Promise.allSettled([
-  getHomepageProducts(8),
+  const [homepageResult, fallbackProductsResult] = await Promise.allSettled([
+    getHomepageProducts(8),
 
-  getProducts({
-    page: 1,
-    page_size: 24,
-    is_available: true,
-    ordering: "-created_at",
-  }),
-]);
+    getProducts({
+      page: 1,
+      page_size: 24,
+      is_available: true,
+      ordering: "-created_at",
+    }),
+  ]);
 
   const homepage =
     homepageResult.status === "fulfilled"
@@ -84,13 +159,26 @@ const [homepageResult, fallbackProductsResult] = await Promise.allSettled([
       ? homepage.new_arrivals
       : fallbackProducts.slice(0, 8);
 
-
   const productsCouldNotLoad =
     homepageResult.status === "rejected" &&
     fallbackProductsResult.status === "rejected";
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd(organizationJsonLd),
+        }}
+      />
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd(websiteJsonLd),
+        }}
+      />
+
       <PromoCarousel products={advertProducts} />
 
       {productsCouldNotLoad ? (

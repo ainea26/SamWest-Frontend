@@ -7,8 +7,36 @@ import { getCategories, unwrapResults } from "@/lib/api";
 import type { Category } from "@/types/category";
 
 export const metadata: Metadata = {
-  title: "Categories",
-  description: "Browse SamWest products arranged by category and subcategory.",
+  title: "Product Categories",
+
+  description:
+    "Browse SamWest product categories including groceries, household products, personal care, food, drinks and other selected products in Kenya.",
+
+  alternates: {
+    canonical: "/categories",
+  },
+
+  openGraph: {
+    type: "website",
+    locale: "en_KE",
+    siteName: "SamWest",
+    url: "/categories",
+    title: "Product Categories | SamWest",
+    description:
+      "Browse SamWest products by category and find groceries, household essentials and more.",
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    title: "Product Categories | SamWest",
+    description:
+      "Browse SamWest products by category and find groceries, household essentials and more.",
+  },
+
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default async function CategoriesPage() {

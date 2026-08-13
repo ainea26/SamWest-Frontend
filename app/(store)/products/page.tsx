@@ -10,7 +10,35 @@ import { getCategories, getProducts, unwrapResults } from "@/lib/api";
 
 export const metadata: Metadata = {
   title: "Products",
-  description: "Browse the full range of selected SamWest products.",
+
+  description:
+    "Browse groceries, household essentials, food, drinks, personal care products and other selected products available from SamWest in Kenya.",
+
+  alternates: {
+    canonical: "/products",
+  },
+
+  openGraph: {
+    type: "website",
+    locale: "en_KE",
+    siteName: "SamWest",
+    url: "/products",
+    title: "Products | SamWest",
+    description:
+      "Browse groceries, household essentials and selected products available from SamWest in Kenya.",
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    title: "Products | SamWest",
+    description:
+      "Browse groceries, household essentials and selected products available from SamWest in Kenya.",
+  },
+
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export const dynamic = "force-dynamic";

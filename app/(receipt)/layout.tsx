@@ -1,13 +1,24 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-type ReceiptLayoutProps = {
-  children: ReactNode;
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+    },
+  },
 };
 
+type ReceiptLayoutProps = Readonly<{
+  children: ReactNode;
+}>;
+
 export default function ReceiptLayout({ children }: ReceiptLayoutProps) {
-  return (
-    <div className="min-h-dvh min-w-0 bg-slate-100 text-slate-950">
-      {children}
-    </div>
-  );
+  return children;
 }

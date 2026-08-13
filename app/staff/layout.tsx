@@ -2,25 +2,25 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-  title: "Booking Management",
-  description:
-    "Protected SamWest booking management portal.",
+  title: "SamWest Staff",
+
   robots: {
     index: false,
     follow: false,
+    nocache: true,
+
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+    },
   },
 };
 
-type StaffLayoutProps = {
+type StaffLayoutProps = Readonly<{
   children: ReactNode;
-};
+}>;
 
-export default function StaffLayout({
-  children,
-}: StaffLayoutProps) {
-  return (
-    <div className="min-h-dvh min-w-0 overflow-x-hidden bg-slate-50">
-      {children}
-    </div>
-  );
+export default function StaffLayout({ children }: StaffLayoutProps) {
+  return children;
 }

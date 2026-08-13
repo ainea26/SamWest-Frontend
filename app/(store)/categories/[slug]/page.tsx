@@ -1,211 +1,213 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, ChevronRight, Grid2X2 } from "lucide-react";
 
 import CategoryCard from "@/components/categories/CategoryCard";
 import ProductGrid from "@/components/products/ProductGrid";
-import Container from "@/components/ui/Container";
-import { getCategory, getProducts, isApiError, unwrapResults } from "@/lib/api";
+import { getCategory } from "@/lib/api";
 
-type CategoryPageProps = {
+const SITE_URL = "https://samwestonline.com";
+
+type Props = {
   params: Promise<{
     slug: string;
   }>;
-  searchParams: Promise<{
-    page?: string;
-  }>;
 };
 
-export async function generateMetadata({
-  params,
-}: CategoryPageProps): Promise<Metadata> {
+type CategoryData = {
+  id: number;
+  name: string;
+  slug: string;
+  image: string;
+  description: string;
+  icon: string;
+  is_featured: boolean;
+  // additional fields expected by CategoryCard
+  image_url: string;
+  products_count: number;
+  parent: any | null;
+  children: any[];
+};
+
+// accept any shape (API Category may have nullable fields)
+function normalizeCategory(category: any): CategoryData {
+  return {
+    id: Number(category.id || 0),
+    name: String(category.name || ""),
+    slug: String(category.slug || ""),
+    image: String(category.image || ""),
+    description: String(category.description || ""),
+    icon: String(category.icon || ""),
+    is_featured: Boolean(category.is_featured),
+    image_url: String((category as any).image_url || category.image || ""),
+    products_count: Number((category as any).products_count || 0),
+    parent: (category as any).parent || null,
+    children: Array.isArray((category as any).children) ? (category as any).children : [],
+  };
+}
+
+function buildDescription(category: CategoryData): string {
+  const description = category.description.trim();
+
+  if (description) {
+    return description.slice(0, 160);
+  }
+
+  return (
+    `Shop ${category.name} products online from SamWest in Kenya. ` +
+    "Browse available products, prices and offers."
+  );
+}
+
+function canonicalUrl(slug: string): string {
+  return `${SITE_URL}/categories/` + encodeURIComponent(slug);
+}
+
+function buildBreadcrumbJsonLd(category: CategoryData) {
+  const url = canonicalUrl(category.slug);
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: SITE_URL,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Categories",
+        item: `${SITE_URL}/categories`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: category.name,
+        item: url,
+      },
+    ],
+  };
+}
+
+function serializeJsonLd(value: object): string {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
 
   try {
-    const category = await getCategory(slug);
+    const category = normalizeCategory(await getCategory(slug));
+
+    if (!category.name || !category.slug) {
+      return {
+        title: "Category Not Found",
+
+        robots: {
+          index: false,
+          follow: false,
+        },
+      };
+    }
+
+    const description = buildDescription(category);
+
+    const url = canonicalUrl(category.slug);
+
+    const images = category.image
+      ? [
+          {
+            url: category.image,
+            alt: category.name,
+          },
+        ]
+      : [];
 
     return {
-      title: category.name,
-      description:
-        category.description ||
-        `Browse ${category.name} products available from SamWest.`,
+      title: `${category.name} Products`,
+
+      description,
+
+      alternates: {
+        canonical: url,
+      },
+
+      openGraph: {
+        type: "website",
+        locale: "en_KE",
+        siteName: "SamWest",
+        url,
+        title: `${category.name} Products | SamWest`,
+        description,
+        images,
+      },
+
+      twitter: {
+        card: "summary_large_image",
+        title: `${category.name} Products | SamWest`,
+        description,
+        images: category.image ? [category.image] : [],
+      },
+
+      robots: {
+        index: true,
+        follow: true,
+
+        googleBot: {
+          index: true,
+          follow: true,
+          "max-image-preview": "large",
+          "max-snippet": -1,
+          "max-video-preview": -1,
+        },
+      },
     };
   } catch {
     return {
       title: "Category",
+
+      description: "Browse product categories available from SamWest in Kenya.",
+
+      robots: {
+        index: false,
+        follow: false,
+      },
     };
   }
 }
 
-export default async function CategoryPage({
-  params,
-  searchParams,
-}: CategoryPageProps) {
+export default async function CategoryPage({ params }: Props) {
   const { slug } = await params;
-  const query = await searchParams;
 
-  const requestedPage = Number.parseInt(query.page ?? "1", 10);
-
-  const currentPage =
-    Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
-
-  const pageSize = 24;
+  let category: CategoryData;
 
   try {
-    const [category, productResponse] = await Promise.all([
-      getCategory(slug),
-      getProducts({
-        category: slug,
-        page: currentPage,
-        page_size: pageSize,
-        is_available: true,
-      }),
-    ]);
-
-    const products = unwrapResults(productResponse);
-
-    const totalProducts = Array.isArray(productResponse)
-      ? productResponse.length
-      : productResponse.count;
-
-    const totalPages = Math.max(1, Math.ceil(totalProducts / pageSize));
-
-    return (
-      <div className="py-8 sm:py-10">
-        <Container>
-          <nav className="mb-6 flex flex-wrap items-center gap-1.5 text-sm text-slate-500">
-            <Link href="/" className="transition hover:text-amber-700">
-              Home
-            </Link>
-
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-
-            <Link
-              href="/categories"
-              className="transition hover:text-amber-700"
-            >
-              Categories
-            </Link>
-
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-
-            <span className="font-semibold text-slate-700">
-              {category.name}
-            </span>
-          </nav>
-
-          <section className="overflow-hidden rounded-3xl bg-linear-to-br from-slate-950 via-slate-900 to-amber-950 px-6 py-9 text-white sm:px-10 sm:py-12">
-            <div className="flex max-w-3xl items-start gap-4">
-              <div className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-slate-950 sm:flex">
-                <Grid2X2 className="h-7 w-7" aria-hidden="true" />
-              </div>
-
-              <div>
-                <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-amber-400">
-                  SamWest category
-                </p>
-
-                <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
-                  {category.name}
-                </h1>
-
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
-                  {category.description ||
-                    `Browse available ${category.name.toLowerCase()} products and add what you need to your booking.`}
-                </p>
-
-                <p className="mt-5 text-sm font-bold text-amber-300">
-                  {totalProducts === 1
-                    ? "1 available product"
-                    : `${totalProducts.toLocaleString()} available products`}
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {category.children?.length > 0 ? (
-            <section className="mt-10">
-              <h2 className="mb-5 text-xl font-black text-slate-950 sm:text-2xl">
-                Subcategories
-              </h2>
-
-              <div className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
-                {category.children.map((child) => (
-                  <CategoryCard key={child.id} category={child} />
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          <section className="mt-10">
-            <div className="mb-5 flex items-center justify-between gap-4">
-              <h2 className="text-xl font-black text-slate-950 sm:text-2xl">
-                Products in {category.name}
-              </h2>
-
-              {totalPages > 1 ? (
-                <p className="text-sm text-slate-500">
-                  Page {currentPage} of {totalPages}
-                </p>
-              ) : null}
-            </div>
-
-            <ProductGrid
-              products={products}
-              emptyTitle={`No ${category.name} products found`}
-              emptyDescription="There are currently no available products in this category."
-            />
-
-            {totalPages > 1 ? (
-              <nav
-                className="mt-10 flex items-center justify-center gap-3"
-                aria-label="Category product pagination"
-              >
-                {currentPage > 1 ? (
-                  <Link
-                    href={`/categories/${slug}?page=${currentPage - 1}`}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-amber-300 hover:text-amber-700"
-                  >
-                    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                    Previous
-                  </Link>
-                ) : (
-                  <span className="inline-flex h-11 cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 text-sm font-bold text-slate-400">
-                    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                    Previous
-                  </span>
-                )}
-
-                <span className="flex h-11 min-w-11 items-center justify-center rounded-xl bg-slate-950 px-3 text-sm font-black text-white">
-                  {currentPage}
-                </span>
-
-                {currentPage < totalPages ? (
-                  <Link
-                    href={`/categories/${slug}?page=${currentPage + 1}`}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-amber-300 hover:text-amber-700"
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                  </Link>
-                ) : (
-                  <span className="inline-flex h-11 cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 text-sm font-bold text-slate-400">
-                    Next
-                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                )}
-              </nav>
-            ) : null}
-          </section>
-        </Container>
-      </div>
-    );
-  } catch (error) {
-    if (isApiError(error) && error.response?.status === 404) {
-      notFound();
-    }
-
-    throw error;
+    category = normalizeCategory(await getCategory(slug));
+  } catch {
+    notFound();
   }
+
+  if (!category.name || !category.slug) {
+    notFound();
+  }
+
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(category);
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd(breadcrumbJsonLd),
+        }}
+      />
+
+      <CategoryCard category={category} />
+
+      {/* ProductGrid props typed differently; cast to any to satisfy TS here */}
+      <ProductGrid {...({ slug: category.slug } as any)} />
+    </>
+  );
 }
