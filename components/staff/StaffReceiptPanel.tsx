@@ -86,14 +86,21 @@ function getReceiptWhatsAppUrl(
 
   const customerName = booking.customer_name.trim() || "Customer";
 
+  const balance = Number(receipt.balance ?? 0);
+
   const message = [
     `Hello ${customerName},`,
     "",
-    "Your payment has been confirmed by SamWest.",
+    balance > 0
+      ? "Your payment has been recorded by SamWest."
+      : "Your payment has been confirmed by SamWest.",
     "",
     `*Booking:* ${booking.reference}`,
     `*Receipt:* ${receipt.receipt_number}`,
     `*Amount paid:* ${receipt.currency} ${receipt.total_paid}`,
+    ...(balance > 0
+      ? [`*Balance:* ${receipt.currency} ${receipt.balance}`]
+      : []),
     "",
     "*View and print your receipt:*",
     receipt.receipt_url,
@@ -114,6 +121,8 @@ export default function StaffReceiptPanel({ booking }: StaffReceiptPanelProps) {
   const [transactionReference, setTransactionReference] = useState("");
 
   const [paymentNote, setPaymentNote] = useState("");
+
+  const [amountPaid, setAmountPaid] = useState(booking.confirmed_total ?? "");
 
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
@@ -158,13 +167,33 @@ export default function StaffReceiptPanel({ booking }: StaffReceiptPanelProps) {
     };
   }, [booking.reference]);
 
+  useEffect(() => {
+    if (booking.confirmed_total) {
+      setAmountPaid(booking.confirmed_total);
+    }
+  }, [booking.confirmed_total]);
+
   const referenceRequired = REFERENCE_REQUIRED_METHODS.includes(paymentMethod);
+
+  const confirmedTotal = Number(booking.confirmed_total ?? 0);
+
+  const parsedAmountPaid = Number(amountPaid);
+
+  const amountPaidIsValid =
+    Number.isFinite(parsedAmountPaid) &&
+    parsedAmountPaid > 0 &&
+    parsedAmountPaid <= confirmedTotal;
+
+  const remainingBalance = amountPaidIsValid
+    ? Math.max(confirmedTotal - parsedAmountPaid, 0)
+    : confirmedTotal;
 
   const canIssue =
     !isIssuing &&
     paymentConfirmed &&
     booking.status !== "cancelled" &&
-    Boolean(booking.confirmed_total) &&
+    confirmedTotal > 0 &&
+    amountPaidIsValid &&
     (!referenceRequired || Boolean(transactionReference.trim()));
 
   async function handleIssueReceipt() {
@@ -178,11 +207,16 @@ export default function StaffReceiptPanel({ booking }: StaffReceiptPanelProps) {
     try {
       const response = await issueStaffBookingReceipt(booking.reference, {
         payment_method: paymentMethod,
+
+        amount_paid: parsedAmountPaid.toFixed(2),
+
         transaction_reference: transactionReference.trim(),
+
         payment_note: paymentNote.trim(),
       });
 
       setReceipt(response.receipt);
+
       setPaymentConfirmed(false);
     } catch (error) {
       setErrorMessage(
@@ -228,17 +262,36 @@ export default function StaffReceiptPanel({ booking }: StaffReceiptPanelProps) {
   if (receipt) {
     const whatsappUrl = getReceiptWhatsAppUrl(booking, receipt);
 
+    const hasBalance = Number(receipt.balance ?? 0) > 0;
+
     return (
-      <section className="min-w-0 border-t border-emerald-200 bg-emerald-50/70 p-3 min-[360px]:p-4 sm:px-6 sm:py-5">
+      <section
+        className={[
+          "min-w-0 border-t p-3 min-[360px]:p-4 sm:px-6 sm:py-5",
+          hasBalance
+            ? "border-amber-200 bg-amber-50/70"
+            : "border-emerald-200 bg-emerald-50/70",
+        ].join(" ")}
+      >
         <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
+            <span
+              className={[
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white",
+                hasBalance ? "bg-amber-600" : "bg-emerald-600",
+              ].join(" ")}
+            >
               <BadgeCheck className="h-5 w-5" aria-hidden="true" />
             </span>
 
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">
-                Payment confirmed
+              <p
+                className={[
+                  "text-[10px] font-black uppercase tracking-widest",
+                  hasBalance ? "text-amber-700" : "text-emerald-700",
+                ].join(" ")}
+              >
+                {hasBalance ? "Partial payment recorded" : "Payment confirmed"}
               </p>
 
               <h3 className="mt-1 wrap-break-word text-sm font-black text-slate-950 min-[360px]:text-base">
@@ -247,10 +300,23 @@ export default function StaffReceiptPanel({ booking }: StaffReceiptPanelProps) {
 
               <p className="mt-1 text-xs font-semibold text-slate-600">
                 {receipt.payment_method_label}
+
                 {receipt.transaction_reference
                   ? ` · ${receipt.transaction_reference}`
                   : ""}
               </p>
+
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold">
+                <span className="text-emerald-700">
+                  Paid: {receipt.currency} {receipt.total_paid}
+                </span>
+
+                {hasBalance ? (
+                  <span className="text-amber-800">
+                    Balance: {receipt.currency} {receipt.balance}
+                  </span>
+                ) : null}
+              </div>
             </div>
           </div>
 
@@ -271,6 +337,7 @@ export default function StaffReceiptPanel({ booking }: StaffReceiptPanelProps) {
               className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50"
             >
               <Copy className="h-4 w-4 shrink-0" aria-hidden="true" />
+
               {wasCopied ? "Copied" : "Copy link"}
             </button>
 
@@ -328,7 +395,34 @@ export default function StaffReceiptPanel({ booking }: StaffReceiptPanelProps) {
         </div>
       ) : (
         <>
-          <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="min-w-0">
+              <label
+                htmlFor={`amount-paid-${booking.reference}`}
+                className="mb-1.5 block text-[10px] font-extrabold text-slate-600"
+              >
+                Amount paid
+              </label>
+
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-xs font-black text-slate-400">
+                  {booking.currency}
+                </span>
+
+                <input
+                  id={`amount-paid-${booking.reference}`}
+                  type="number"
+                  min="0.01"
+                  max={booking.confirmed_total ?? undefined}
+                  step="0.01"
+                  value={amountPaid}
+                  onChange={(event) => setAmountPaid(event.target.value)}
+                  placeholder="0.00"
+                  className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white pl-12 pr-3 text-xs font-black text-slate-800 outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                />
+              </div>
+            </div>
+
             <div className="min-w-0">
               <label
                 htmlFor={`payment-method-${booking.reference}`}
@@ -377,24 +471,76 @@ export default function StaffReceiptPanel({ booking }: StaffReceiptPanelProps) {
                 className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold uppercase text-slate-800 outline-none placeholder:normal-case placeholder:font-normal placeholder:text-slate-400 focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
               />
             </div>
+          </div>
 
-            <div className="min-w-0">
-              <label
-                htmlFor={`payment-note-${booking.reference}`}
-                className="mb-1.5 block text-[10px] font-extrabold text-slate-600"
-              >
-                Payment note
-              </label>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <p className="text-[9px] font-extrabold uppercase tracking-wide text-slate-400">
+                Confirmed total
+              </p>
 
-              <input
-                id={`payment-note-${booking.reference}`}
-                type="text"
-                value={paymentNote}
-                onChange={(event) => setPaymentNote(event.target.value)}
-                placeholder="Optional internal note"
-                className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none placeholder:font-normal placeholder:text-slate-400 focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
-              />
+              <p className="mt-1 text-sm font-black text-slate-950">
+                {booking.currency} {confirmedTotal.toFixed(2)}
+              </p>
             </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <p className="text-[9px] font-extrabold uppercase tracking-wide text-slate-400">
+                Amount paid
+              </p>
+
+              <p className="mt-1 text-sm font-black text-emerald-700">
+                {booking.currency}{" "}
+                {amountPaidIsValid ? parsedAmountPaid.toFixed(2) : "0.00"}
+              </p>
+            </div>
+
+            <div
+              className={[
+                "rounded-xl border p-3",
+                remainingBalance > 0
+                  ? "border-amber-200 bg-amber-50"
+                  : "border-emerald-200 bg-emerald-50",
+              ].join(" ")}
+            >
+              <p className="text-[9px] font-extrabold uppercase tracking-wide text-slate-500">
+                Remaining balance
+              </p>
+
+              <p
+                className={[
+                  "mt-1 text-sm font-black",
+                  remainingBalance > 0 ? "text-amber-800" : "text-emerald-700",
+                ].join(" ")}
+              >
+                {booking.currency} {remainingBalance.toFixed(2)}
+              </p>
+            </div>
+          </div>
+
+          {amountPaid && !amountPaidIsValid ? (
+            <p className="mt-2 text-xs font-bold text-red-700">
+              Amount paid must be greater than zero and cannot exceed the
+              confirmed total.
+            </p>
+          ) : null}
+
+          <div className="mt-3">
+            <label
+              htmlFor={`payment-note-${booking.reference}`}
+              className="mb-1.5 block text-[10px] font-extrabold text-slate-600"
+            >
+              Payment note
+            </label>
+
+            <input
+              id={`payment-note-${booking.reference}`}
+              type="text"
+              value={paymentNote}
+              onChange={(event) => setPaymentNote(event.target.value)}
+              placeholder="Optional internal note"
+              className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none placeholder:font-normal placeholder:text-slate-400 focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+            />
           </div>
 
           <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-amber-200 bg-white p-3">
@@ -408,9 +554,20 @@ export default function StaffReceiptPanel({ booking }: StaffReceiptPanelProps) {
             <span className="text-xs font-bold leading-5 text-slate-700">
               I confirm that SamWest has received{" "}
               <strong className="text-slate-950">
-                {booking.currency} {booking.confirmed_total}
+                {booking.currency}{" "}
+                {amountPaidIsValid ? parsedAmountPaid.toFixed(2) : "0.00"}
               </strong>{" "}
               for this booking.
+              {amountPaidIsValid && remainingBalance > 0 ? (
+                <>
+                  {" "}
+                  A balance of{" "}
+                  <strong className="text-amber-800">
+                    {booking.currency} {remainingBalance.toFixed(2)}
+                  </strong>{" "}
+                  remains outstanding.
+                </>
+              ) : null}
             </span>
           </label>
 
@@ -431,7 +588,10 @@ export default function StaffReceiptPanel({ booking }: StaffReceiptPanelProps) {
             ) : (
               <>
                 <Banknote className="h-4 w-4" aria-hidden="true" />
-                Confirm paid and issue receipt
+
+                {remainingBalance > 0
+                  ? "Record payment and issue receipt"
+                  : "Confirm paid and issue receipt"}
               </>
             )}
           </button>

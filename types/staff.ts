@@ -121,8 +121,9 @@ export type StaffReceipt = {
 
 export type IssueReceiptRequest = {
   payment_method: PaymentMethod;
-  transaction_reference?: string;
-  payment_note?: string;
+  amount_paid: string;
+  transaction_reference: string;
+  payment_note: string;
 };
 
 export type IssueReceiptResponse = {

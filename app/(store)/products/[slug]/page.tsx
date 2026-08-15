@@ -252,7 +252,9 @@ export default async function ProductPage({ params }: Props) {
         }}
       />
 
-      <ProductDetails product={product as any} />
+      <div className="overflow-x-hidden py-4 sm:py-8 lg:py-10">
+        <ProductDetails product={product as any} />
+      </div>
     </>
   );
 }

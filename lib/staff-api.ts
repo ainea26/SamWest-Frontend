@@ -31,8 +31,12 @@ const staffApi = axios.create({
   },
 });
 
-function saveCsrfToken(token: string): void {
-  if (typeof window === "undefined") {
+function saveCsrfToken(
+  token: string,
+): void {
+  if (
+    typeof window === "undefined"
+  ) {
     return;
   }
 
@@ -43,7 +47,9 @@ function saveCsrfToken(token: string): void {
 }
 
 export function getSavedCsrfToken(): string {
-  if (typeof window === "undefined") {
+  if (
+    typeof window === "undefined"
+  ) {
     return "";
   }
 
@@ -103,15 +109,21 @@ export async function getStaffBookings(
   options: GetStaffBookingsOptions = {},
 ): Promise<StaffBooking[]> {
   const response = await staffApi.get<
-    StaffBooking[] | PaginatedStaffBookings
+    StaffBooking[] |
+      PaginatedStaffBookings
   >("/staff/bookings/", {
     params: {
-      search: options.search || undefined,
-      status: options.status || undefined,
+      search:
+        options.search || undefined,
+
+      status:
+        options.status || undefined,
     },
   });
 
-  if (Array.isArray(response.data)) {
+  if (
+    Array.isArray(response.data)
+  ) {
     return response.data;
   }
 
@@ -127,11 +139,14 @@ export async function updateStaffBooking(
 
   const response =
     await staffApi.post<StaffBookingUpdateResponse>(
-      `/staff/bookings/${encodeURIComponent(reference)}/status/`,
+      `/staff/bookings/${encodeURIComponent(
+        reference,
+      )}/status/`,
       data,
       {
         headers: {
-          "X-CSRFToken": csrfToken,
+          "X-CSRFToken":
+            csrfToken,
         },
       },
     );
@@ -145,14 +160,19 @@ export async function getStaffBookingReceipt(
   try {
     const response =
       await staffApi.get<StaffReceipt>(
-        `/staff/bookings/${encodeURIComponent(reference)}/receipt/`,
+        `/staff/bookings/${encodeURIComponent(
+          reference,
+        )}/receipt/`,
       );
 
     return response.data;
   } catch (error) {
     if (
-      axios.isAxiosError(error) &&
-      error.response?.status === 404
+      axios.isAxiosError(
+        error,
+      ) &&
+      error.response?.status ===
+        404
     ) {
       return null;
     }
@@ -170,11 +190,14 @@ export async function issueStaffBookingReceipt(
 
   const response =
     await staffApi.post<IssueReceiptResponse>(
-      `/staff/bookings/${encodeURIComponent(reference)}/receipt/`,
+      `/staff/bookings/${encodeURIComponent(
+        reference,
+      )}/receipt/`,
       data,
       {
         headers: {
-          "X-CSRFToken": csrfToken,
+          "X-CSRFToken":
+            csrfToken,
         },
       },
     );
@@ -188,7 +211,9 @@ export async function getPublicReceipt(
 ): Promise<StaffReceipt> {
   const response =
     await staffApi.get<StaffReceipt>(
-      `/orders/receipts/${encodeURIComponent(receiptNumber)}/`,
+      `/orders/receipts/${encodeURIComponent(
+        receiptNumber,
+      )}/`,
       {
         params: {
           token,
@@ -208,12 +233,15 @@ export async function logoutStaff(): Promise<void> {
     {},
     {
       headers: {
-        "X-CSRFToken": csrfToken,
+        "X-CSRFToken":
+          csrfToken,
       },
     },
   );
 
-  if (typeof window !== "undefined") {
+  if (
+    typeof window !== "undefined"
+  ) {
     sessionStorage.removeItem(
       CSRF_STORAGE_KEY,
     );
@@ -223,14 +251,20 @@ export async function logoutStaff(): Promise<void> {
 function extractValidationMessage(
   value: unknown,
 ): string | null {
-  if (typeof value === "string") {
+  if (
+    typeof value === "string"
+  ) {
     return value;
   }
 
   if (Array.isArray(value)) {
-    for (const item of value) {
+    for (
+      const item of value
+    ) {
       const message =
-        extractValidationMessage(item);
+        extractValidationMessage(
+          item,
+        );
 
       if (message) {
         return message;
@@ -264,7 +298,11 @@ export function getStaffErrorMessage(
   error: unknown,
   fallback: string,
 ): string {
-  if (!axios.isAxiosError(error)) {
+  if (
+    !axios.isAxiosError(
+      error,
+    )
+  ) {
     return fallback;
   }
 
